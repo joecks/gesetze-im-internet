@@ -33,7 +33,7 @@ if __name__ == "__main__":
                 doknr = doc.get('doknr')
                 complete_title = f'{jurabk} {enbez} - {titel}'
 
-                for text in doc.findall('*/fussnoten/Content'):
+                for text in doc.findall('textdaten/text/Content'):
 
                     t = extract_text(text)
                     # filter (gegenstandslos) or (weggefallen) or -
