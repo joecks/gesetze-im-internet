@@ -4,6 +4,40 @@ import re
 import statistics
 import xml.etree.ElementTree as ET
 import re
+from transformers import PreTrainedTokenizerFast
+
+
+tokenizer = PreTrainedTokenizerFast(tokenizer_file="tokenizer.json")
+
+
+def token_len(s):
+    return len(tokenizer(s).input_ids)
+
+
+def split_string(s, max_tokens=512, sep="\n"):
+    if token_len(s) <= max_tokens:
+        return [s]
+    
+    chunks = s.split(sep)
+    if len(chunks) == 1:
+        # The dataset doesn't contain any long documents where a single line 
+        # is longer than 512 tokens so this should not happen
+        raise Exception("This should not happen")
+    
+    current_len = 0
+    current_string = []
+    strings = []
+    for chunk in chunks:
+        chunk_len = token_len(chunk)
+        if chunk_len + current_len <= max_tokens:
+            current_string.append(chunk)
+            current_len += chunk_len
+        else:
+            strings.append(sep.join(current_string))
+            current_string = []
+            current_len = 0
+    return strings
+
 
 COMMENTS = ""
 
@@ -42,30 +76,32 @@ if __name__ == "__main__":
                     continue
 
                 for text in doc.findall("textdaten/text/Content"):
-                    t = extract_text(text)
+                    extracted_text = extract_text(text)
+                    texts = split_string(extracted_text, max_tokens=512)
                     # filter (gegenstandslos) or (weggefallen) or -
-                    if t and len(t.strip()) > 20:
-                        p = {
-                            "snippet": f"{complete_title}\n{t}",
-                            "tags": [],
-                            "id": doknr,
-                            "properties": {
-                                "snippet": t,
-                                "title": complete_title,
-                            },
-                        }
-                        if date and date.strip() != "0000-00-00":
-                            p["properties"]["publication_date"] = f"{date}T00:00:00Z"
-                        if jurabk:
-                            p["properties"]["jurabk"] = jurabk
-                            p["tags"].append(jurabk)
-                        if titel:
-                            p["properties"]["original_title"] = titel
-                        if enbez:
-                            p["properties"]["enbez"] = enbez
-                            p["tags"].append(enbez)
+                    for t in texts:
+                        if t and len(t.strip()) > 20:
+                            p = {
+                                "snippet": f"{complete_title}\n{t}",
+                                "tags": [],
+                                "id": doknr,
+                                "properties": {
+                                    "snippet": t,
+                                    "title": complete_title,
+                                },
+                            }
+                            if date and date.strip() != "0000-00-00":
+                                p["properties"]["publication_date"] = f"{date}T00:00:00Z"
+                            if jurabk:
+                                p["properties"]["jurabk"] = jurabk
+                                p["tags"].append(jurabk)
+                            if titel:
+                                p["properties"]["original_title"] = titel
+                            if enbez:
+                                p["properties"]["enbez"] = enbez
+                                p["tags"].append(enbez)
 
-                        paragraphs.append(p)
+                            paragraphs.append(p)
     # print(len(paragraphs))
     # list_len = list(map(lambda x: len(x['snippet']), paragraphs))
     # average = sum( list_len )/ len(paragraphs)
